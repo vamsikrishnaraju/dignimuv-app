@@ -7,16 +7,27 @@
     "icon": "./assets/images/icon.png",
     "scheme": "dignimuvapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We use your location to set pickup and dropoff points on the map."
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyDrEWRzmwe2Vmhb1d99lk88xgHcRHIFHG8"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDrEWRzmwe2Vmhb1d99lk88xgHcRHIFHG8"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
