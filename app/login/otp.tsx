@@ -17,7 +17,7 @@ export default function OtpScreen() {
 
   const onVerify = () => {
     if (otp.length === 4) {
-      router.replace("/booking");
+      router.replace("/home/(tabs)/home");
     }
   };
 

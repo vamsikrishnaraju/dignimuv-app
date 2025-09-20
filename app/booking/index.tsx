@@ -1,11 +1,13 @@
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from "expo-location";
-import { useRouter } from "expo-router";
+import { router } from "expo-router"; // Change this line
 import React, { useEffect, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, Text, TextInput, TouchableOpacity, View } from "react-native";
-import MapView, { Marker, Polyline, Region } from "react-native-maps";
+import { KeyboardAvoidingView, Modal, Platform, Text, TextInput, TouchableOpacity, View } from "react-native";
+import MapView, { Marker, Region } from "react-native-maps";
+import { LatLng } from "../common/commondata";
+import ChooseAmbulance from "./ambulance";
 
-type LatLng = { latitude: number; longitude: number };
 type SearchResult = { description: string; place_id: string; location?: LatLng };
 type RoutePoint = { latitude: number; longitude: number };
 
@@ -20,44 +22,31 @@ export default function BookingScreen() {
 
   const [pickup, setPickup] = useState<LatLng | null>(null);
   const [dropoff, setDropoff] = useState<LatLng | null>(null);
-  const [locationStatus, setLocationStatus] = useState("Checking...");
+
   const [pickupAddress, setPickupAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
-  const [routeCoordinates, setRouteCoordinates] = useState<RoutePoint[]>([]);
-  const [currentAddress, setCurrentAddress] = useState("Getting location...");
   
   // Schedule states
   const [rideMode, setRideMode] = useState<"now" | "schedule">("now");
   const [scheduledDate, setScheduledDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [toDate, setToDate] = useState<Date | null>(null);
+  const [showFromTimePicker, setShowFromTimePicker] = useState(false);
+  const [fromTime, setFromTime] = useState(new Date());
   
   // Autocomplete states
   const [pickupSearch, setPickupSearch] = useState("");
-  const [dropoffSearch, setDropoffSearch] = useState("");
+  const [currentAddress, setCurrentAddress] = useState("");
   const [pickupSuggestions, setPickupSuggestions] = useState<SearchResult[]>([]);
-  const [dropoffSuggestions, setDropoffSuggestions] = useState<SearchResult[]>([]);
-  const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
-  const [showDropoffSuggestions, setShowDropoffSuggestions] = useState(false);
   const [healthCondition, setHealthCondition] = useState('');
   
-  interface Location {
-    address: string
-    latitude: number
-    longitude: number
-  }
+  // Modal state
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [mapModalType, setMapModalType] = useState<"pickup" | "dropoff" | null>(null);
+  const [tempLocation, setTempLocation] = useState<LatLng | null>(null);
+  const [showAmbulanceOptions, setShowAmbulanceOptions] = useState(false);
   
-  interface BookingData {
-    name: string
-    phone: string
-    email: string
-    health_condition: string
-    pickup_location: Location | null
-    drop_location: Location | null
-    from_date: Date
-    to_date: Date
-    channel: string
-  }
 
 
   // Search for locations
@@ -104,76 +93,7 @@ export default function BookingScreen() {
     return null;
   };
 
-  // Handle pickup search
-  const handlePickupSearch = async (text: string) => {
-    setPickupSearch(text);
-    setPickupAddress(text);
-    
-    if (text.length >= 3) {
-      const results = await searchLocations(text);
-      setPickupSuggestions(results);
-      setShowPickupSuggestions(true);
-    } else {
-      setPickupSuggestions([]);
-      setShowPickupSuggestions(false);
-    }
-  };
 
-  // Handle dropoff search
-  const handleDropoffSearch = async (text: string) => {
-    setDropoffSearch(text);
-    setDropoffAddress(text);
-    
-    if (text.length >= 3) {
-      const results = await searchLocations(text);
-      setDropoffSuggestions(results);
-      setShowDropoffSuggestions(true);
-    } else {
-      setDropoffSuggestions([]);
-      setShowDropoffSuggestions(false);
-    }
-  };
-
-  // Select pickup location
-  const selectPickupLocation = async (result: SearchResult) => {
-    setPickupAddress(result.description);
-    setPickupSearch(result.description);
-    setShowPickupSuggestions(false);
-    
-    const location = await getPlaceDetails(result.place_id);
-    console.log(location)
-    if (location) {
-      setPickup(location);
-      // Animate map to selected location
-      mapRef.current?.animateToRegion({
-        ...location,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-      
-      // If dropoff is also set, calculate route
-      if (dropoff) {
-        await getRoute(location, dropoff);
-      }
-    }
-  };
-
-  // Select dropoff location
-  const selectDropoffLocation = async (result: SearchResult) => {
-    setDropoffAddress(result.description);
-    setDropoffSearch(result.description);
-    setShowDropoffSuggestions(false);
-    
-    const location = await getPlaceDetails(result.place_id);
-    if (location) {
-      setDropoff(location);
-      
-      // If pickup is also set, calculate route
-      if (pickup) {
-        await getRoute(pickup, location);
-      }
-    }
-  };
 
   // Get route between pickup and dropoff
   const getRoute = async (origin: LatLng, destination: LatLng) => {
@@ -189,7 +109,7 @@ export default function BookingScreen() {
         
         // Decode the polyline points
         const coordinates = decodePolyline(points);
-        setRouteCoordinates(coordinates);
+        //setRouteCoordinates(coordinates);
         
         // Fit map to show entire route
         if (coordinates.length > 0) {
@@ -297,60 +217,6 @@ export default function BookingScreen() {
   };
 
 
-  const createBooking = async () => {
-    
-    const pickupLocation: Location = {
-        address: pickupAddress,
-        latitude: pickup?.latitude,
-        longitude: pickup?.longitude
-    }
-
-    const dropOffLocation: Location = {
-        address: dropoffAddress,
-        latitude: dropoff?.latitude,
-        longitude: dropoff?.longitude
-    }
-    const today = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(today.getDate() + 1); 
-    const bookingData: BookingData = {
-        name: '',
-        phone: '988989878',
-        email: 'test@diginiMuv.com',
-        pickup_location: pickupLocation,
-        drop_location: dropOffLocation,
-        health_condition: healthCondition,
-        from_date: today,
-        to_date: tomorrow,
-        channel: 'APP'
-    }
-    console.log(bookingData)
-    try {
-        const response = await fetch("http://10.0.2.2:8000/api/bookings", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookingData),
-        })
-        console.log("response " , response)
-        if (response.ok) {
-            const data = await response.json()
-            setPickup(null);
-            setPickupAddress('')
-            setDropoff(null)
-            setDropoffAddress('')
-            setHealthCondition('')
-        } else {
-        console.error('Failed to send OTP, but you can still enter OTP for testing')
-        }
-        } catch (error) {
-            console.log(error)
-            console.error('Error sending OTP, but you can still enter OTP for testing')
-        } finally {
-            //setIsLoading(false)
-        }
-    }
 
   useEffect(() => {
     (async () => {
@@ -368,7 +234,6 @@ export default function BookingScreen() {
           });
           
           setPickup({ latitude, longitude });
-          setLocationStatus("Location set!");
           
           // Get address for current location
           try {
@@ -401,10 +266,10 @@ export default function BookingScreen() {
             setCurrentAddress("Location unavailable");
           }
         } else {
-          setLocationStatus("Permission denied");
+          //setLocationStatus("Permission denied");
         }
       } catch (error) {
-        setLocationStatus("Error: " + (error as Error).message);
+        //setLocationStatus("Error: " + (error as Error).message);
       }
     })();
   }, []);
@@ -480,214 +345,314 @@ export default function BookingScreen() {
     })();
   };
 
-  const router = useRouter();
+  const onBooking = (ambulanceType: string | null) => {
+    setShowAmbulanceOptions(false);
+    router.push({
+    pathname: "/booking/bookingconfirmation",
+    params: {
+      pickupAddress,
+      dropoffAddress,
+      ambulanceType: ambulanceType || 'Not specified',
+      bookingTime: rideMode === "now" ? "Now" : formatDateTime(scheduledDate, fromTime),
+      healthCondition
+    }
+  });
+  }
+  
+  // Add after formatTime function
+const formatDateTime = (date: Date, time: Date) => {
+  const combinedDate = new Date(date);
+  combinedDate.setHours(time.getHours());
+  combinedDate.setMinutes(time.getMinutes());
+  
+  return combinedDate.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+  // Listen for selected location from map-select screen
+  useEffect(() => {
+    // You can use expo-router's useLocalSearchParams or a global state/store for this
+    // Example with expo-router:
+    // const params = useLocalSearchParams();
+    // if (params.type === "pickup" && params.address && params.latitude && params.longitude) {
+    //   setPickupAddress(params.address);
+    //   setPickup({ latitude: Number(params.latitude), longitude: Number(params.longitude) });
+    // }
+    // if (params.type === "dropoff" && params.address && params.latitude && params.longitude) {
+    //   setDropoffAddress(params.address);
+    //   setDropoff({ latitude: Number(params.latitude), longitude: Number(params.longitude) });
+    // }
+  }, [/* params change */]);
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-white"
+      className="flex-1 bg-white mt-10"
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
       {/* Header */}
-      <View className="bg-white px-4 py-3 border-b border-gray-200">
-        <View className="flex-row items-center justify-between">
-          {/* Left side - Phone number and location */}
-          <View className="flex-1">
-            <Text className="text-sm text-gray-600">Logged in as</Text>
-            <Text className="text-base font-semibold text-gray-900">+91 87122 72022</Text>
-            <View className="flex-row items-center mt-1">
-              <View className="w-2 h-2 bg-green-500 rounded-full mr-2"></View>
-              <Text className="text-xs text-gray-500" numberOfLines={1}>
-                {currentAddress}
-              </Text>
-            </View>
-          </View>
-          
-          {/* Right side - Menu icon */}
-          <TouchableOpacity 
-            onPress={() => router.push("/menu")}
-            className="p-2"
-          >
-            <View className="flex-col gap-1">
-              <View className="w-6 h-0.5 bg-gray-800"></View>
-              <View className="w-6 h-0.5 bg-gray-800"></View>
-              <View className="w-6 h-0.5 bg-gray-800"></View>
-            </View>
-          </TouchableOpacity>
-        </View>
+      <View className="flex-row items-center px-4 pt-6 pb-2 bg-white">
+        <TouchableOpacity onPress={() => router.back()} className="mr-2">
+          <Ionicons name="arrow-back" size={24} color="#222" />
+        </TouchableOpacity>
+        <Text className="text-lg font-semibold text-gray-900">Book Ambulance</Text>
       </View>
 
-      <View className="flex-1">
-        <View className="h-[50%]">
-          <MapView
-            ref={mapRef}
-            style={{ flex: 1 }}
-            initialRegion={mapRegion}
-            onRegionChangeComplete={onRegionChange}
-            showsUserLocation={true}
-            showsMyLocationButton={true}
-            mapType="standard"
-            provider="google"
-            showsCompass={true}
-            showsScale={true}
-            showsTraffic={false}
-            showsBuildings={true}
-            showsIndoors={true}
-          >
-            {pickup && (
-              <Marker coordinate={pickup} title="Pickup" pinColor="green" />
-            )}
-            {dropoff && (
-              <Marker coordinate={dropoff} title="Dropoff" pinColor="red" />
-            )}
-            {routeCoordinates.length > 0 && (
-              <Polyline
-                coordinates={routeCoordinates}
-                strokeWidth={5}
-                strokeColor="#007bff"
-              />
-            )}
-          </MapView>
-          {/* Fallback overlay if map doesn't load */}
-          <View className="absolute inset-0 bg-gray-100 justify-center items-center" style={{ display: 'none' }}>
-            <Text className="text-gray-500 text-lg">Map Loading...</Text>
-            <Text className="text-gray-400 text-sm mt-2">If map doesn't appear, try restarting the app</Text>
+      {/* Booking Card */}
+      <View className="flex-1 px-4 pt-4 pb-24">
+        <View className="bg-white rounded-2xl shadow-md p-4">
+          {/* Pickup */}
+          <View className="flex-row items-center mb-4">
+            <View className="w-3 h-3 bg-green-500 rounded-full mr-2" />
+            <Text className="text-sm font-medium text-gray-700 flex-1">Pickup location</Text>
           </View>
-        </View>
-
-        <View className="flex-1 px-4 py-3 gap-3">
-          <View>
-            <Text className="text-xs text-gray-400 mb-2">Pickup Location</Text>
+          <TouchableOpacity onPress={() => { setMapModalType("pickup"); setShowMapModal(true); }}>
             <TextInput
-              placeholder="Enter pickup address"
+              placeholder="Select pickup address"
               value={pickupAddress}
-              onChangeText={handlePickupSearch}
-              className="h-12 border border-gray-300 rounded-xl px-4 bg-white"
+              editable={false}
+              className="h-12 border border-gray-300 rounded-xl px-4 bg-white mb-2"
             />
-            {showPickupSuggestions && (
-              <View style={{ maxHeight: 150, backgroundColor: '#fff', borderRadius: 8, marginTop: 5, borderWidth: 1, borderColor: '#e5e7eb' }}>
-                <FlatList
-                  data={pickupSuggestions}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => selectPickupLocation(item)}
-                      className="p-3 border-b border-gray-200"
-                    >
-                      <Text>{item.description}</Text>
-                    </TouchableOpacity>
-                  )}
-                  keyExtractor={(item) => item.place_id}
-                  nestedScrollEnabled={true}
-                />
-              </View>
-            )}
-           
-          </View>
+          </TouchableOpacity>
 
-          <View>
-            <Text className="text-xs text-gray-400 mb-2">Dropoff Location</Text>
+          {/* Dropoff */}
+          <View className="flex-row items-center mb-4 mt-4">
+            <View className="w-3 h-3 bg-red-500 rounded-full mr-2" />
+            <Text className="text-sm font-medium text-gray-700 flex-1">Where to?</Text>
+          </View>
+          <TouchableOpacity onPress={() => { setMapModalType("dropoff"); setShowMapModal(true); }}>
             <TextInput
-              placeholder="Enter dropoff address"
+              placeholder="Select dropoff address"
               value={dropoffAddress}
-              onChangeText={handleDropoffSearch}
-              className="h-12 border border-gray-300 rounded-xl px-4 bg-white"
+              editable={false}
+              className="h-12 border border-gray-300 rounded-xl px-4 bg-white mb-2"
             />
-            {showDropoffSuggestions && (
-              <View style={{ maxHeight: 150, backgroundColor: '#fff', borderRadius: 8, marginTop: 5, borderWidth: 1, borderColor: '#e5e7eb' }}>
-                <FlatList
-                  data={dropoffSuggestions}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => selectDropoffLocation(item)}
-                      className="p-3 border-b border-gray-200"
-                    >
-                      <Text>{item.description}</Text>
-                    </TouchableOpacity>
-                  )}
-                  keyExtractor={(item) => item.place_id}
-                  nestedScrollEnabled={true}
-                />
-              </View>
-            )}
-            <View>
-                <Text className="text-xs text-gray-400 mb-2">Patient Information (Optional)</Text>
-                <TextInput
-                placeholder="Enter Patient Health Information"
-                value={healthCondition}
-                multiline={true}
-                className="h-12 border border-gray-300 rounded-xl px-4 bg-white"
-                numberOfLines={5}
-                onChangeText={setHealthCondition}
-                style={{height: 100}}/>
-            </View>
+          </TouchableOpacity>
+          {/* Health Condition */}
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Health Condition</Text>
+            <TextInput
+              placeholder="Describe any health conditions"
+              value={healthCondition}
+              onChangeText={setHealthCondition}
+              className="h-32 border border-gray-300 rounded-xl px-4 bg-white"
+              numberOfLines={5}
+            />
           </View>
-
-          <View className="flex-row bg-gray-100 rounded-xl p-1">
-            <TouchableOpacity 
-              onPress={() => setRideMode("now")} 
-              className={`flex-1 py-3 rounded-lg ${rideMode === "now" ? "bg-white" : ""}`}
+          {/* Ride Now / Schedule */}
+          <View className="flex-row bg-gray-100 rounded-xl p-1 mt-4 mb-4">
+            <TouchableOpacity
+              activeOpacity={0.8}
+              className={`py-3 px-6 rounded-xl flex-1 flex-row items-center gap-4 ${rideMode === "now" ? "bg-blue-600" : "bg-gray-200"}`}
+              onPress={() => setRideMode("now")}
             >
-              <Text className={`text-center font-medium ${rideMode === "now" ? "text-gray-900" : "text-gray-600"}`}>
-                Ride now
+              <Ionicons name="time" color="white" size={20}></Ionicons>
+              <Text className={`text-base font-medium ${rideMode === "now" ? "text-white" : "text-gray-700"}`}>
+                Now
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={() => setRideMode("schedule")} 
-              className={`flex-1 py-3 rounded-lg ${rideMode === "schedule" ? "bg-white" : ""}`}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              className={`py-3 px-6 rounded-xl flex-1 flex-row items-center gap-4 ${rideMode === "schedule" ? "bg-blue-600" : "bg-gray-200"}`}
+              onPress={() => setRideMode("schedule")}
             >
-              <Text className={`text-center font-medium ${rideMode === "schedule" ? "text-gray-900" : "text-gray-600"}`}>
+              <Ionicons name="calendar" color="white" size={20}></Ionicons>
+              <Text className={`text-base font-medium ${rideMode === "schedule" ? "text-white" : "text-gray-700"}`}>
                 Schedule
               </Text>
             </TouchableOpacity>
           </View>
 
-          {rideMode === "schedule" && (
-            <View className="gap-3">
-              <View>
-                <Text className="text-xs text-gray-400 mb-2">Pickup Date</Text>
-                <TouchableOpacity 
-                  onPress={() => setShowDatePicker(true)}
-                  className="h-12 border border-gray-300 rounded-xl px-4 bg-white justify-center"
-                >
-                  <Text className="text-gray-800">{formatDate(scheduledDate)}</Text>
-                </TouchableOpacity>
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={scheduledDate}
-                    mode="date"
-                    onChange={handleDateChange}
-                    minimumDate={new Date()}
-                  />
-                )}
-              </View>
+          {/* Schedule Date/Time */}
+          { rideMode === "schedule" && (
+            <View className="gap-3 mb-4">
+              <View className="flex-row gap-2">
+                {/* From Date */}
+                <View className="flex-1">
+                  <Text className="text-xs text-gray-700 mb-2">From Date</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(true)}
+                    className="h-12 border border-gray-400 rounded-xl px-4 bg-white justify-center"
+                  >
+                    <Text className="text-gray-800">{formatDate(scheduledDate)}</Text>
+                  </TouchableOpacity>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={scheduledDate}
+                      mode="date"
+                      onChange={handleDateChange}
+                      minimumDate={new Date()}
+                    />
+                  )}
+                </View>
 
-              <View>
-                <Text className="text-xs text-gray-400 mb-2">Pickup Time</Text>
-                <TouchableOpacity 
-                  onPress={() => setShowTimePicker(true)}
-                  className="h-12 border border-gray-300 rounded-xl px-4 bg-white justify-center"
-                >
-                  <Text className="text-gray-800">{formatTime(scheduledDate)}</Text>
-                </TouchableOpacity>
-                {showTimePicker && (
-                  <DateTimePicker
-                    value={scheduledDate}
-                    mode="time"
-                    onChange={handleTimeChange}
-                    minimumDate={new Date()}
-                  />
-                )}
+                {/* From Time */}
+                <View className="flex-1">
+                  <Text className="text-xs text-gray-700 mb-2">From Time</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowFromTimePicker(true)}
+                    className="h-12 border border-gray-400 rounded-xl px-4 bg-white justify-center"
+                  >
+                    <Text className="text-gray-800">{formatTime(fromTime)}</Text>
+                  </TouchableOpacity>
+                  {showFromTimePicker && (
+                    <DateTimePicker
+                      value={fromTime}
+                      mode="time"
+                      onChange={(event, selectedTime) => {
+                        setShowFromTimePicker(false);
+                        if (selectedTime) {
+                          setFromTime(selectedTime);
+                        }
+                      }}
+                    />
+                  )}
+                </View>
               </View>
             </View>
           )}
-
-          <TouchableOpacity className="bg-blue-600 py-4 rounded-xl" onPress={createBooking}>
-            <Text className="text-white text-center font-medium">
-              {rideMode === "now" ? "Book Ride Now" : `Schedule Ride for ${formatDate(scheduledDate)} at ${formatTime(scheduledDate)}`}
-            </Text>
-          </TouchableOpacity>
         </View>
+        <TouchableOpacity
+                    activeOpacity={0.8}
+                    className="bg-blue-600 py-4 px-6 rounded-xl w-full"
+                    onPress={() => setShowAmbulanceOptions(true)}
+                  >
+                    <Text className="text-white text-center text-base semi-bold font-medium">
+                      Continue
+                    </Text>
+                  </TouchableOpacity>
       </View>
+      
+
+
+      <Modal visible={showMapModal} animationType="slide">
+        <View className="flex-1 bg-white">
+          <View className="p-4 flex-row items-center justify-between">
+            <Text className="text-lg font-semibold">
+              {mapModalType === "pickup" ? "Select Pickup Location" : "Select Dropoff Location"}
+            </Text>
+            <TouchableOpacity onPress={() => setShowMapModal(false)}>
+              <Ionicons name="close" size={28} color="#222" />
+            </TouchableOpacity>
+          </View>
+          <View className="px-4 pb-2">
+            <TextInput
+              placeholder="Search location"
+              value={pickupSearch}
+              onChangeText={async (text) => {
+                setPickupSearch(text);
+                if (text.length >= 3) {
+                  const results = await searchLocations(text);
+                  setPickupSuggestions(results);
+                } else {
+                  setPickupSuggestions([]);
+                }
+              }}
+              className="h-12 border border-gray-300 rounded-xl px-4 bg-white"
+            />
+            {pickupSuggestions.length > 0 && (
+              <View className="bg-white rounded-xl shadow mt-2 max-h-40">
+                {pickupSuggestions.map((item) => (
+                  <TouchableOpacity
+                    key={item.place_id}
+                    className="p-3 border-b border-gray-200"
+                    onPress={async () => {
+                      setPickupSearch(item.description);
+                      setPickupSuggestions([]);
+                      const location = await getPlaceDetails(item.place_id);
+                      if (location) {
+                        setTempLocation(location);
+                        // Optionally, animate map to location:
+                        mapRef.current?.animateToRegion({
+                          ...location,
+                          latitudeDelta: 0.01,
+                          longitudeDelta: 0.01,
+                        });
+                      }
+                    }}
+                  >
+                    <Text>{item.description}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+          <MapView
+            ref={mapRef}
+            style={{ flex: 1 }}
+            initialRegion={mapRegion}
+            region={tempLocation ? { ...tempLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 } : mapRegion}
+            onPress={e => setTempLocation(e.nativeEvent.coordinate)}
+          >
+            {tempLocation && <Marker coordinate={tempLocation} />}
+          </MapView>
+          <View className="p-4">
+            <TouchableOpacity
+              className="bg-blue-600 py-3 rounded-xl"
+              disabled={!tempLocation}
+              onPress={async () => {
+                if (tempLocation) {
+                  let address = "";
+                  try {
+                    const addressResponse = await Location.reverseGeocodeAsync(tempLocation);
+                    
+                    if (addressResponse && addressResponse.length > 0) {
+                      const addr = addressResponse[0];
+                      //address = [addr.street, addr.city, addr.region, addr.country].filter(Boolean).join(", ");
+                      address = addr.formattedAddress || [addr.street, addr.city, addr.region, addr.country].filter(Boolean).join(", ");
+                    }
+                  } catch (error) {}
+                  if (mapModalType === "pickup") {
+
+                    setPickup(tempLocation);
+                    setPickupAddress(address || `Lat: ${tempLocation.latitude}, Lng: ${tempLocation.longitude}`);
+                  } else {
+                    setDropoff(tempLocation);
+                    setDropoffAddress(address || `Lat: ${tempLocation.latitude}, Lng: ${tempLocation.longitude}`);
+                  }
+                  setShowMapModal(false);
+                  setTempLocation(null);
+                  setPickupSearch("");
+                  setPickupSuggestions([]);
+                }
+              }}
+            >
+              <Text className="text-white text-center font-semibold text-lg">
+                Confirm Location
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+<Modal 
+  visible={showAmbulanceOptions} 
+  animationType="slide" 
+  transparent={true}
+  onRequestClose={() => setShowAmbulanceOptions(false)}
+>
+  <TouchableOpacity 
+    activeOpacity={1} 
+    onPress={() => setShowAmbulanceOptions(false)}
+    className="flex-1 bg-black/50 justify-end"
+  >
+    <TouchableOpacity 
+      activeOpacity={1}
+      onPress={e => e.stopPropagation()} 
+      className="bg-white rounded-t-3xl h-[75%]"
+    >
+      <View className="w-16 h-1 bg-gray-300 rounded-full mx-auto mt-2 mb-4" />
+      <ChooseAmbulance onBooking={onBooking}/>
+    </TouchableOpacity>
+  </TouchableOpacity>
+</Modal>
+      
     </KeyboardAvoidingView>
   );
 }
