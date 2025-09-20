@@ -20,11 +20,6 @@ const menuItems = [
     route: "/account/manage" 
   },
   { 
-    icon: "gift-outline", 
-    title: "Refer & earn", 
-    route: "/refer" 
-  },
-  { 
     icon: "share-social-outline", 
     title: "Share app", 
     route: "/share" 
@@ -33,11 +28,6 @@ const menuItems = [
     icon: "information-circle-outline", 
     title: "About us", 
     route: "/profile/aboutus" 
-  },
-  { 
-    icon: "help-circle-outline", 
-    title: "Need help", 
-    route: "/help" 
   },
     { 
     icon: "log-out-outline", 

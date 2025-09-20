@@ -146,9 +146,9 @@ export default function BookingConfirmation() {
         }
               
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 mt-10">
       {/* Header */}
-      <View className="flex-row items-center px-4 pt-12 pb-4 bg-white border-b border-gray-200">
+      <View className="flex-row items-center px-4 pt-12 pb-4 border-b border-gray-200">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>

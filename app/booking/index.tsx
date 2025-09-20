@@ -394,11 +394,11 @@ const formatDateTime = (date: Date, time: Date) => {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-white mt-10"
+      className="flex-1  mt-12"
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
       {/* Header */}
-      <View className="flex-row items-center px-4 pt-6 pb-2 bg-white">
+      <View className="flex-row items-center px-4 pt-6 pb-2">
         <TouchableOpacity onPress={() => router.back()} className="mr-2">
           <Ionicons name="arrow-back" size={24} color="#222" />
         </TouchableOpacity>
@@ -518,19 +518,18 @@ const formatDateTime = (date: Date, time: Date) => {
               </View>
             </View>
           )}
-        </View>
-        <TouchableOpacity
+                  <TouchableOpacity
                     activeOpacity={0.8}
-                    className="bg-blue-600 py-4 px-6 rounded-xl w-full"
+                    className="bg-blue-600 py-4 px-6 mt-7 rounded-xl w-full"
                     onPress={() => setShowAmbulanceOptions(true)}
                   >
                     <Text className="text-white text-center text-base semi-bold font-medium">
                       Continue
                     </Text>
                   </TouchableOpacity>
+        </View>
       </View>
       
-
 
       <Modal visible={showMapModal} animationType="slide">
         <View className="flex-1 bg-white">

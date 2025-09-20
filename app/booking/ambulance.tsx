@@ -24,8 +24,8 @@ export default function ChooseAmbulance({ onBooking }: ChooseAmbulanceProps) {
 
       <ScrollView className="flex-1 px-2">
         {ambulanceOptions.map((option, idx) => (
-          <TouchableOpacity key={idx} className={`bg-white rounded-xl shadow border border-gray-200 p-4 mb-4 flex-row justify-between items-center
-        ${selectedAmbulance === option.type ? 'border-blue-700 bg-blue-100' : ''}`}
+          <TouchableOpacity key={idx} className={`bg-white rounded-xl border border-gray-200 p-4 mb-4 flex-row justify-between items-center
+        ${selectedAmbulance === option.type ? 'border-blue-900 border border-width-100 bg-blue-700' : ''}`}
           onPress={() => {setSelectedAmbulance(option.type)}}>
             <View className="flex-1">
               <View className="flex-row items-center mb-1">
