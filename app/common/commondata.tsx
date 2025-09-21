@@ -36,3 +36,4 @@ export const ambulanceOptions = [
   }
 
 export type LatLng = { latitude: number; longitude: number };
+

@@ -1,11 +1,14 @@
+import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import client from "../common/client";
 
 export default function BookingsScreen() {
   const router = useRouter();
   const [bookings, setBookings] = useState<any[]>([])
+  const { phoneNumber } = useAuth();
 
   type Booking = {
   id: string;
@@ -38,21 +41,13 @@ export default function BookingsScreen() {
     });
   };
 
-
-  const apiUrl = "http://127.0.0.1:8000"
   const getBookings = async () => {
     try {
-        const response = await fetch("http://10.0.2.2:8000/api/bookings/by-phone", {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ "phone": "988989878", "channel": "app"}),
-        })
-        console.log("response " , response.status)
-        if (response.ok) {
+      //setIsLoading(true)
+      const response = await client.get(`/admin/bookings/phone/${phoneNumber}`)
+        if (response.status === 200) {
             console.log("in success")
-          const data = await response.json()
+          const data = response.data
           setBookings(data)
         } else {
           console.error('Failed to send OTP, but you can still enter OTP for testing')
@@ -80,17 +75,20 @@ export default function BookingsScreen() {
         <Text className="text-white text-2xl font-semibold ml-4">Booking History</Text>
       </View>
 
-       <ScrollView className="flex-1 px-4 pt-4">
+       <ScrollView className="flex-1 px-4 pt-4 gap-2">
         {bookings.map((booking) => (
           <TouchableOpacity
             key={booking.id}
             onPress={() => router.push(`/booking/${booking.id}`)}
-            className="bg-white rounded-xl p-4 mb-4 border border-gray-100"
+            className="bg-white rounded-xl p-4 mb-4 border border-gray-300"
           >
             <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-base font-medium">
-                {formatDate(booking.from_date)}
-              </Text>
+              <View className="flex-row items-center  space-x-2 gap-2">
+                <Ionicons name="calendar" size={20} color="#F59E0B" />
+                <Text className="text-base font-medium font-semibold">
+                  {formatDate(booking.fromDate)}
+                </Text>
+              </View>
               <View className={`px-2 py-1 rounded-full ${
                 booking.status === 'completed' ? 'bg-green-100' : 
                 booking.status === 'cancelled' ? 'bg-red-100' : 'bg-yellow-100'
@@ -105,24 +103,26 @@ export default function BookingsScreen() {
             </View>
 
             <View className="space-y-2">
-              <View className="flex-row items-center">
-                <Ionicons name="location" size={16} color="#22C55E" />
-                <Text className="text-gray-600 ml-2">From</Text>
-                <Text className="text-gray-900 ml-2">{booking.pickup_location.address}</Text>
+              <View className="flex-column">
+                <Text className="text-gray-600 ml-2 font-medium">From:</Text>
+                <View className="flex-row items-center">
+                  <Ionicons name="location" size={24} color="#22C55E" />
+                  <Text className="text-gray-900 ml-2">{booking.fromAddress}</Text>
+                </View>
               </View>
 
-              <View className="flex-row items-center">
+              { /* <View className="flex-row items-center">
                 <Ionicons name="location" size={16} color="#EF4444" />
                 <Text className="text-gray-600 ml-2">To</Text>
                 <Text className="text-gray-900 ml-2">{booking.drop_location.address}</Text>
-              </View>
+              </View> */}
 
               <View className="flex-row items-center justify-between mt-2">
                 <View className="flex-row items-center">
-                  <Ionicons name="time-outline" size={16} color="#666" />
+                  <Ionicons name="time-outline" size={24} color="#666" />
                   <Text className="text-gray-600 ml-2">{formatTime(booking.time)}</Text>
                 </View>
-                <Text className="text-blue-600 font-bold">₹{booking.amount.toFixed(2)}</Text>
+                <Text className="text-blue-600 font-bold">₹{850}</Text>
               </View>
             </View>
           </TouchableOpacity>

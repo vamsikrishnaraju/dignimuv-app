@@ -1,14 +1,17 @@
+import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { KeyboardAvoidingView, Platform, Text, TextInput, TouchableOpacity, View } from "react-native";
-
 export default function Login() {
   const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState("");
+  const { setPhoneNumber: setAuthPhoneNumber } = useAuth();
 
   const onContinue = () => {
+
     const normalized = phoneNumber.replace(/\D/g, "");
     if (normalized.length < 8) return; // simple client guard
+    setAuthPhoneNumber(normalized);
     router.push({ pathname: "/login/otp", params: { phone: normalized } });
   };
 

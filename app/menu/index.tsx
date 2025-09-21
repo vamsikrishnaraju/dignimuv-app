@@ -1,9 +1,11 @@
+import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 export default function MenuScreen() {
   const router = useRouter();
+    const { phoneNumber, logout } = useAuth();
 
   const menuItems = [
     {
@@ -32,6 +34,7 @@ export default function MenuScreen() {
       icon: "🚪",
       onPress: () => {
         // Handle logout
+        logout();
         router.replace("/login");
       },
     },

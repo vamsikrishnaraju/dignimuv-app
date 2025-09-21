@@ -1,8 +1,11 @@
+import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import BookingSuccessModal from '../common/BookingSuccessModal';
+import client from '../common/client';
 import { ambulanceOptions } from '../common/commondata';
 
 type BookingConfirmationParams = {
@@ -30,21 +33,27 @@ interface Location {
   }
   
   interface BookingData {
-    name: string
+    patientName: string
     phone: string
-    email: string
-    health_condition: string
-    pickup_location: Location | null
-    drop_location: Location | null
-    from_date: string
-    channel: string
+    fromAddress: string
+    fromLatitude: number
+    fromLongitude: number
+    toAddress: string
+    toLatitude: number
+    toLongitude: number
+    time: string
+    notes: string
   }
+
 
 export default function BookingConfirmation() {
   const params = useLocalSearchParams<BookingConfirmationParams>();
   const [ambulanceDetails, setAmbulanceDetails] = React.useState<AmbulanceDetails | null>(null);
   const [pickupLocation, setPickupLocation] = React.useState<Location | null>(null);
   const [dropoffLocation, setDropoffLocation] = React.useState<Location | null>(null);
+  const { phoneNumber } = useAuth();
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [bookingId, setBookingId] = useState<string>("");
 
   useEffect(() => {
     // Find matching ambulance details
@@ -66,7 +75,7 @@ export default function BookingConfirmation() {
       }
     };
     fetchLocations();
-    }, [params.pickupAddress, params.dropoffAddress]);
+    }, []);
 
   if (!ambulanceDetails) {
     return (
@@ -108,47 +117,57 @@ export default function BookingConfirmation() {
     }
   };
 
+const extractTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+
   const createBooking = async () => {
       const today = new Date();
       const tomorrow = new Date();
       tomorrow.setDate(today.getDate() + 1); 
+      console.log(pickupLocation, dropoffLocation, phoneNumber);
       const bookingData: BookingData = {
-          name: '',
-          phone: '988989878',
-          email: 'test@diginiMuv.com',
-          pickup_location: pickupLocation,
-          drop_location: dropoffLocation,
-          health_condition: params.healthDescription || '',
-          from_date: params.bookingTime || '',
-          channel: 'APP'
+          patientName: "Test Patient",
+          phone: phoneNumber,
+          fromAddress: pickupLocation?.address || '',
+          fromLatitude: pickupLocation?.latitude || 0,
+          fromLongitude: pickupLocation?.longitude || 0,
+          toAddress: dropoffLocation?.address || '',
+          toLatitude: dropoffLocation?.latitude || 0,
+          toLongitude: dropoffLocation?.longitude || 0,
+          fromDate: params.bookingTime ? new Date(params.bookingTime) : today,
+          time: (params.bookingTime ? extractTime(params.bookingTime) : extractTime(today.toISOString())),
+          notes: params.healthDescription || ''
       }
-      console.log(bookingData)
-      try {
-          const response = await fetch("http://10.0.2.2:8000/api/bookings", {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(bookingData),
-          })
-          console.log("response " , response)
-          if (response.ok) {
-              const data = await response.json()
 
+      try {
+          const response = await client.post("/admin/bookings", bookingData);
+          if (response.status === 201) {
+              const data = response.data
+              console.log("Booking created: ", data)
+               setBookingId(data.id);
+              setShowSuccessModal(true);
+              //router.push({ pathname: "/booking/bookingstatus", params: { bookingId: data.id } });
           } else {
-          console.error('Failed to send OTP, but you can still enter OTP for testing')
+          console.error('Failed to create booking. Please try again.')
           }
-          } catch (error) {
-              console.log(error)
-              console.error('Error sending OTP, but you can still enter OTP for testing')
-          } finally {
-          }
-        }
+      } catch (error) { 
+          console.log("error", error)
+          console.error('Error creating booking:', error)
+      } finally {
+      }
+  }
               
   return (
-    <View className="flex-1 mt-10">
+    <View className="flex-1 bg-white">
       {/* Header */}
-      <View className="flex-row items-center px-4 pt-12 pb-4 border-b border-gray-200">
+      <View className="flex-row items-center mt-5 px-4 pt-12 pb-4 border-b border-gray-200">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
@@ -238,6 +257,13 @@ export default function BookingConfirmation() {
           </Text>
         </TouchableOpacity>
       </View>
+        <BookingSuccessModal
+            visible={showSuccessModal}
+            bookingId={bookingId}
+            onClose={() => { 
+              setShowSuccessModal(false);
+              router.push("/home/(tabs)/home");
+            }} />
     </View>
   );
 }
